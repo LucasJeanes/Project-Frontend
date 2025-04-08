@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TextInput, Button, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Image } from 'react-native';
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
@@ -11,9 +11,9 @@ import * as SecureStore from 'expo-secure-store';
 
 const Stack = createNativeStackNavigator();
 
-const backendUrl = "https://fc9d-80-233-41-139.ngrok-free.app";
-
-//get secure store working for tomorrow
+//const backendUrl = "https://ae02-80-233-47-38.ngrok-free.app";
+const backendUrl = "https://bbcbrian.arraylist.me";
+const imageUrl = `${backendUrl}/images/img-1744118347341-.png`;
 
 export default function App() {
   return (
@@ -101,9 +101,56 @@ function AccountScreen({ navigation }) {
 
 
 function HomeScreen({ navigation }) {
+  const [imageDataUri, setImageDataUri] = useState(null);
+  const [isLoadingImage, setIsLoadingImage] = useState(true);
   const [roomName, setRoomName] = useState('');
   const [rooms, setRooms] = useState([]);
 
+  useEffect(() => {
+    let isMounted = true;
+  
+    const fetchImage = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('jwt');
+        const imageUrl = `${backendUrl}/images/img-1744118347341-.png`; // Your image filename
+  
+        const response = await fetch(imageUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+  
+        if (!response.ok) throw new Error('Image fetch failed');
+        console.log("response.ok", response.ok);
+        
+        const blob = await response.blob();
+        const reader = new FileReader();
+  
+        reader.onloadend = () => {
+          if (isMounted) {
+            setImageDataUri(reader.result);
+            setIsLoadingImage(false);
+          }
+        };
+  
+        reader.onerror = (err) => {
+          console.error("Error reading blob:", err);
+          setIsLoadingImage(false);
+        };
+  
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        console.error("Error loading image:", err.message);
+        setIsLoadingImage(false);
+      }
+    };
+  
+    fetchImage();
+    console.log("imageDataUri preview:", imageDataUri?.slice(0, 50));
+    return () => { isMounted = false };
+  }, []);
+  
   const fetchRooms = async () => {
     try {
       const token = await SecureStore.getItemAsync('jwt');
@@ -145,6 +192,7 @@ function HomeScreen({ navigation }) {
 
       const data = await res.json();
       await fetchRooms();
+      await fetchImage();
       console.log('Created room:', data);
     } catch (err) {
       console.error('Failed to create room:', err);
@@ -183,6 +231,14 @@ function HomeScreen({ navigation }) {
           navigation.navigate("Accounts")
           }
         />
+        {isLoadingImage && <Text>Loading secure image...</Text>}
+        {imageDataUri && (
+          <Image
+            source={{ uri: imageDataUri }}
+            style={{ width: 300, height: 200, borderRadius: 10, marginBottom: 15 }}
+            resizeMode="contain"
+          />
+        )}
         <TextInput
           style={styles.input}
           value={roomName}
@@ -213,17 +269,59 @@ function HomeScreen({ navigation }) {
     );
 }
 
-
-
-
-// James: message
 function ActiveRoomScreen({ route }) {
+  const [imageDataUri, setImageDataUri] = useState(null);
+  const [isLoadingImage, setIsLoadingImage] = useState(true);
   const { roomId, wsUrl } = route.params; //route.params returns object
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const socketRef = useRef(null);
 
   useEffect(() => {
+    let isMounted = true;
+  
+    const fetchImage = async () => {
+      try {
+        const token = await SecureStore.getItemAsync('jwt');
+        const imageUrl = `${backendUrl}/images/img-1744118347341-.png`; // Your image filename
+  
+        const response = await fetch(imageUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        
+        // console.log(await response.json());
+        // if (!response.ok) throw new Error('Image fetch failed');
+        console.log("response.ok", response.ok);
+        
+        const blob = await response.blob();
+        const reader = new FileReader();
+  
+        reader.onloadend = () => {
+          if (isMounted) {
+            setImageDataUri(reader.result);
+            setIsLoadingImage(false);
+          }
+        };
+  
+        reader.onerror = (err) => {
+          console.error("Error reading blob:", err);
+          setIsLoadingImage(false);
+        };
+  
+        reader.readAsDataURL(blob);
+      } catch (err) {
+        console.error("Error loading image:", err.message);
+        setIsLoadingImage(false);
+      }
+    };
+  
+    fetchImage();
+    console.log("imageDataUri preview:", imageDataUri?.slice(0, 50));
+
     connectWebSocket(wsUrl);
     return () => socketRef.current?.close();
   }, [wsUrl]);
@@ -237,11 +335,36 @@ function ActiveRoomScreen({ route }) {
     socketRef.current.onopen = () => {
       console.log('Connected to WebSocket');
       socketRef.current.send(token);
+     //call retrieveAllMessages endpoint to retrieve history 
     };
 
+/* Add message handling for image when messageType is image > check image Path
+    messageType: {
+        type: String,
+        required: true,
+        default: "text"
+    },
+    imagePath: {
+        type: String,
+        required: false,
+    },
+*/
     socketRef.current.onmessage = (event) => {
-      setMessages(prev => [...prev, event.data]);
+      try {
+        const data = JSON.parse(event.data);
+        if (data.username && data.content) {
+          const formattedMessage = `${data.username}: ${data.content}`;
+          setMessages(prev => [...prev, formattedMessage]);
+        } else {
+          // Fallback for plain strings (e.g., "Someone joined the room!")
+          setMessages(prev => [...prev, event.data]);
+        }
+      } catch (err) {
+        // In case it's not JSON (e.g., plain "user joined" message)
+        setMessages(prev => [...prev, event.data]);
+      }
     };
+    
 
     socketRef.current.onclose = () => {
       console.log('WebSocket closed');
@@ -255,6 +378,7 @@ function ActiveRoomScreen({ route }) {
   const sendMessage = () => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(input);
+      console.log('Message sent:', input);
       setInput('');
     }
   };

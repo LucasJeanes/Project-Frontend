@@ -377,7 +377,7 @@ function ActiveRoomScreen({ route }) {
         if (data.messageType === "image") {
           // FETCH THE FUCKING IMAGE
           const imageName = data.imagePath;
-          console.warn("fetching IMAGE");
+          console.log("fetching IMAGE");
           fetchImage(imageName, data.username, data.content);
 
 

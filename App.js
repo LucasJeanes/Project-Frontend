@@ -316,9 +316,48 @@ function ActiveRoomScreen({ route }) {
     const token = await SecureStore.getItemAsync('jwt');
     if (!token) throw new Error("No token available");
 
-    socketRef.current.onopen = () => {
+    socketRef.current.onopen = async () => {
       console.log('Connected to WebSocket');
       socketRef.current.send(token);
+
+      // GET HISTORY OF MESSAGES
+      const response = await fetch(`${backendUrl}/rooms/${roomId}/messages`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      const messages = JSON.parse(await response.json());
+
+      // console.log(messages);
+
+      try {
+        for (let i = 0; i < messages.length; i++) {
+          const data = messages[i];
+          if (data.messageType === "image") {
+            // FETCH THE FUCKING IMAGE
+            const imageName = data.imagePath;
+            console.log("fetching IMAGE");
+            await fetchImage(imageName, data.createdAt, data.username, data.content);
+          } else {
+            if (data.username && data.content) {
+              const formattedMessage = `${new Date(data.createdAt).toLocaleTimeString()} ${data.username}: ${data.content}`;
+              const obj = {
+                msg: formattedMessage,
+                type: "text"
+              }
+              setMessages(prev => [...prev, { msg: formattedMessage, type: "text" }]);
+            } else {
+              // Fallback for plain strings (e.g., "Someone joined the room!")
+              setMessages(prev => [...prev, { msg: event.data, type: "text" }]);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error while fetching history", e);
+      }
+
     };
 
     const fetchImage = async (name, createdAt, username, content) => {
@@ -392,12 +431,12 @@ function ActiveRoomScreen({ route }) {
             setMessages(prev => [...prev, { msg: formattedMessage, type: "text" }]);
           } else {
             // Fallback for plain strings (e.g., "Someone joined the room!")
-            setMessages(prev => [...prev, {msg: event.data, type: "text"}]);
+            setMessages(prev => [...prev, { msg: event.data, type: "text" }]);
           }
         }
       } catch (err) {
         // In case it's not JSON (e.g., plain "user joined" message)
-        setMessages(prev => [...prev, {msg: event.data, type: "text"}]);
+        setMessages(prev => [...prev, { msg: event.data, type: "text" }]);
       }
     };
 
@@ -462,7 +501,7 @@ function ActiveRoomScreen({ route }) {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Room ID: {roomId}</Text>
-      <ScrollView 
+      <ScrollView
         style={styles.messages}
         ref={scrollViewRef}
         onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} // Auto-scroll to the bottom      
@@ -482,7 +521,7 @@ function ActiveRoomScreen({ route }) {
             </View>
         ))}
       </ScrollView>
-      {}
+      { }
       <Button title="Attach Image" onPress={pickAndSendImage} />
       <TextInput
         style={styles.input}

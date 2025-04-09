@@ -158,7 +158,6 @@ function HomeScreen({ navigation }) {
 
       const data = await res.json();
       await fetchRooms();
-      await fetchImage();
       console.log('Created room:', data);
     } catch (err) {
       console.error('Failed to create room:', err);
@@ -242,6 +241,7 @@ function ActiveRoomScreen({ route }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const socketRef = useRef(null);
+  const scrollViewRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -281,7 +281,7 @@ function ActiveRoomScreen({ route }) {
         name: 'upload.jpg'
       });
   
-      formData.append('content', ''); // optional caption
+      formData.append('content', 'sent an image'); // optional caption
   
       try {
         const res = await fetch(`${backendUrl}/rooms/${roomId}/image`, {
@@ -384,10 +384,10 @@ function ActiveRoomScreen({ route }) {
               msg: formattedMessage,
               type: "text"
             }
-            setMessages(prev => [...prev, formattedMessage]);
+            setMessages(prev => [...prev, { msg: formattedMessage, type: "text" }]);
           } else {
             // Fallback for plain strings (e.g., "Someone joined the room!")
-            setMessages(prev => [...prev, event.data]);
+            setMessages(prev => [...prev, {msg: event.data, type: "text"}]);
           }
         }
       } catch (err) {
@@ -417,7 +417,11 @@ function ActiveRoomScreen({ route }) {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Room ID: {roomId}</Text>
-      <ScrollView style={styles.messages}>
+      <ScrollView 
+        style={styles.messages}
+        ref={scrollViewRef}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} // Auto-scroll to the bottom      
+      >
         {messages.map((msg, idx) => (
           msg.type === "text" ?
             <Text key={idx}>{msg.msg}</Text> :
@@ -433,13 +437,7 @@ function ActiveRoomScreen({ route }) {
             </View>
         ))}
       </ScrollView>
-      {/* {imageDataUri && (
-        <Image
-          source={{ uri: imageDataUri }}
-          style={{ width: 300, height: 200, borderRadius: 10, marginBottom: 15 }}
-          resizeMode="contain"
-        />
-      )} */}
+      {}
       <Button title="Attach Image" onPress={pickAndSendImage} />
       <TextInput
         style={styles.input}

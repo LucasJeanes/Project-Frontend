@@ -158,7 +158,6 @@ function HomeScreen({ navigation }) {
 
       const data = await res.json();
       await fetchRooms();
-      await fetchImage();
       console.log('Created room:', data);
     } catch (err) {
       console.error('Failed to create room:', err);
@@ -243,6 +242,7 @@ function ActiveRoomScreen({ route }) {
   const [input, setInput] = useState('');
   const socketRef = useRef(null);
   const [image, setImage] = useState(null);
+  const scrollViewRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -389,7 +389,7 @@ function ActiveRoomScreen({ route }) {
               msg: formattedMessage,
               type: "text"
             }
-            setMessages(prev => [...prev, {msg: formattedMessage, type: "text"}]);
+            setMessages(prev => [...prev, { msg: formattedMessage, type: "text" }]);
           } else {
             // Fallback for plain strings (e.g., "Someone joined the room!")
             setMessages(prev => [...prev, {msg: event.data, type: "text"}]);
@@ -462,7 +462,11 @@ function ActiveRoomScreen({ route }) {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Room ID: {roomId}</Text>
-      <ScrollView style={styles.messages}>
+      <ScrollView 
+        style={styles.messages}
+        ref={scrollViewRef}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })} // Auto-scroll to the bottom      
+      >
         {messages.map((msg, idx) => (
           msg.type === "text" ?
             <Text key={idx}>{msg.msg}</Text> :
@@ -478,13 +482,7 @@ function ActiveRoomScreen({ route }) {
             </View>
         ))}
       </ScrollView>
-      {/* {imageDataUri && (
-        <Image
-          source={{ uri: imageDataUri }}
-          style={{ width: 300, height: 200, borderRadius: 10, marginBottom: 15 }}
-          resizeMode="contain"
-        />
-      )} */}
+      {}
       <Button title="Attach Image" onPress={pickAndSendImage} />
       <TextInput
         style={styles.input}

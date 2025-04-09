@@ -321,7 +321,7 @@ function ActiveRoomScreen({ route }) {
       socketRef.current.send(token);
     };
 
-    const fetchImage = async (name, username, content) => {
+    const fetchImage = async (name, createdAt, username, content) => {
       try {
         const token = await SecureStore.getItemAsync('jwt');
         const imageUrl = `${backendUrl}/images/${name}`; // Your image filename
@@ -345,7 +345,7 @@ function ActiveRoomScreen({ route }) {
 
         reader.onloadend = () => {
           setImageDataUri(reader.result);
-          const formattedMessage = `${username}: ${content}`;
+          const formattedMessage = `${new Date(createdAt).toLocaleTimeString()} ${username}: ${content}`;
           const obj = {
             msg: formattedMessage,
             type: "image",
@@ -378,13 +378,13 @@ function ActiveRoomScreen({ route }) {
           // FETCH THE FUCKING IMAGE
           const imageName = data.imagePath;
           console.log("fetching IMAGE");
-          fetchImage(imageName, data.username, data.content);
+          fetchImage(imageName, data.createdAt, data.username, data.content);
 
 
 
         } else {
           if (data.username && data.content) {
-            const formattedMessage = `${data.username}: ${data.content}`;
+            const formattedMessage = `${new Date(data.createdAt).toLocaleTimeString()} ${data.username}: ${data.content}`;
             const obj = {
               msg: formattedMessage,
               type: "text"

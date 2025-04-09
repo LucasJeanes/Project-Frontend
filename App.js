@@ -242,6 +242,7 @@ function ActiveRoomScreen({ route }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const socketRef = useRef(null);
+  const [image, setImage] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -258,21 +259,24 @@ function ActiveRoomScreen({ route }) {
       console.warn("JWT missing");
       return;
     }
-  
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       console.warn("Permission to access gallery denied");
       return;
     }
-  
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: false,
       quality: 1,
     });
-  
+
     if (!result.canceled && result.assets.length > 0) {
       const image = result.assets[0];
+
+      setImage(image);
+      /*
       const formData = new FormData();
   
       formData.append('chatImage', {
@@ -281,7 +285,7 @@ function ActiveRoomScreen({ route }) {
         name: 'upload.jpg'
       });
   
-      formData.append('content', ''); // optional caption
+      formData.append('content', 'the message'); // optional caption
   
       try {
         const res = await fetch(`${backendUrl}/rooms/${roomId}/image`, {
@@ -302,6 +306,7 @@ function ActiveRoomScreen({ route }) {
       } catch (e) {
         console.error("Error sending image:", e);
       }
+      */
     }
   };
 
@@ -384,15 +389,15 @@ function ActiveRoomScreen({ route }) {
               msg: formattedMessage,
               type: "text"
             }
-            setMessages(prev => [...prev, formattedMessage]);
+            setMessages(prev => [...prev, {msg: formattedMessage, type: "text"}]);
           } else {
             // Fallback for plain strings (e.g., "Someone joined the room!")
-            setMessages(prev => [...prev, event.data]);
+            setMessages(prev => [...prev, {msg: event.data, type: "text"}]);
           }
         }
       } catch (err) {
         // In case it's not JSON (e.g., plain "user joined" message)
-        setMessages(prev => [...prev, event.data]);
+        setMessages(prev => [...prev, {msg: event.data, type: "text"}]);
       }
     };
 
@@ -406,11 +411,51 @@ function ActiveRoomScreen({ route }) {
     };
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(input);
-      console.log('Message sent:', input);
-      setInput('');
+      console.log("running sendMessage")
+      if (image !== null) { // send image
+        const token = await SecureStore.getItemAsync('jwt');
+
+        const formData = new FormData();
+
+        formData.append('chatImage', {
+          uri: JSON.parse(JSON.stringify(image.uri)),
+          type: 'image/jpeg',
+          name: 'upload.jpg'
+        });
+
+        setImage(null);
+        setInput('');
+
+        formData.append('content', JSON.parse(JSON.stringify(input))); // optional caption
+
+        try {
+          const res = await fetch(`${backendUrl}/rooms/${roomId}/image`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+            body: formData
+          });
+
+          if (!res.ok) {
+            const errText = await res.text();
+            console.error("Image upload failed:", errText);
+          } else {
+
+            console.log("Image sent successfully");
+          }
+        } catch (e) {
+          console.error("Error sending image:", e);
+        }
+
+      } else { // send normal message
+        socketRef.current.send(input);
+        console.log('Message sent:', input);
+        setInput('');
+      }
     }
   };
 
@@ -421,9 +466,9 @@ function ActiveRoomScreen({ route }) {
         {messages.map((msg, idx) => (
           msg.type === "text" ?
             <Text key={idx}>{msg.msg}</Text> :
-            <View>
+            <View key={idx}>
 
-              <Text key={idx}>{msg.msg}</Text>
+              <Text>{msg.msg}</Text>
               <Image
                 source={{ uri: msg.uri }}
                 style={{ width: 300, height: 200 }}

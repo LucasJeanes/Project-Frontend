@@ -3,6 +3,7 @@ import { View, Text, TextInput, Button, ScrollView, StyleSheet, Image } from 're
 import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as SecureStore from 'expo-secure-store';
+import * as ImagePicker from 'expo-image-picker';
 
 // Send userID to backend, get JWT back
 // Then when sending messages, send JWT in header and get username returned
@@ -251,6 +252,59 @@ function ActiveRoomScreen({ route }) {
     return () => socketRef.current?.close();
   }, [wsUrl]);
 
+  const pickAndSendImage = async () => {
+    const token = await SecureStore.getItemAsync('jwt');
+    if (!token) {
+      console.warn("JWT missing");
+      return;
+    }
+  
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      console.warn("Permission to access gallery denied");
+      return;
+    }
+  
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 1,
+    });
+  
+    if (!result.canceled && result.assets.length > 0) {
+      const image = result.assets[0];
+      const formData = new FormData();
+  
+      formData.append('chatImage', {
+        uri: image.uri,
+        type: 'image/jpeg',
+        name: 'upload.jpg'
+      });
+  
+      formData.append('content', ''); // optional caption
+  
+      try {
+        const res = await fetch(`${backendUrl}/rooms/${roomId}/image`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+          body: formData
+        });
+  
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error("Image upload failed:", errText);
+        } else {
+          console.log("Image sent successfully");
+        }
+      } catch (e) {
+        console.error("Error sending image:", e);
+      }
+    }
+  };
+
   const connectWebSocket = async (wsUrl) => {
     socketRef.current = new WebSocket(wsUrl);
 
@@ -386,6 +440,7 @@ function ActiveRoomScreen({ route }) {
           resizeMode="contain"
         />
       )} */}
+      <Button title="Attach Image" onPress={pickAndSendImage} />
       <TextInput
         style={styles.input}
         value={input}

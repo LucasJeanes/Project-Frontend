@@ -12,9 +12,8 @@ import * as ImagePicker from 'expo-image-picker';
 
 const Stack = createNativeStackNavigator();
 
-//const backendUrl = "https://ae02-80-233-47-38.ngrok-free.app";
-const backendUrl = "https://bbcbrian.arraylist.me";
-const imageUrl = `${backendUrl}/images/img-1744118347341-.png`;
+const backendUrl = "https://075e-80-233-37-38.ngrok-free.app";
+//const backendUrl = "https://bbcbrian.arraylist.me";
 
 export default function App() {
   return (
@@ -78,6 +77,19 @@ function AccountScreen({ navigation }) {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await SecureStore.setItemAsync('jwt', '');
+      console.log("Logged out successfully.");
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' }],
+      });
+    } catch (err) {
+      console.error('Logout error:', err.message);
+    }
+  }
+
   return (
     <View style={styles.container}>
       <TextInput
@@ -96,24 +108,39 @@ function AccountScreen({ navigation }) {
       />
       <Button title="Login" onPress={handleLogin} />
       <Button title="Sign Up" onPress={handleSignup} />
+      <Button title="Logout" onPress={handleLogout} />
     </View>
   );
 }
 
 
 function HomeScreen({ navigation }) {
-  const [imageDataUri, setImageDataUri] = useState(null);
-  const [isLoadingImage, setIsLoadingImage] = useState(true);
+  const [userId, setUserId] = useState(null);
   const [roomName, setRoomName] = useState('');
   const [rooms, setRooms] = useState([]);
+
+  const getUserIdFromToken = async () => {
+    const token = await SecureStore.getItemAsync('jwt');
+    if (!token) {
+      console.warn("No JWT found");
+    }
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.sub;
+      } catch (err) {
+        console.error("Error decoding JWT:", err);
+        return null;
+      }
+  };
 
   useEffect(() => {
     let isMounted = true;
 
+    getUserIdFromToken().then((id) => {
+      console.log("Decoded userId from JWT:", id);
+      if (isMounted) setUserId(id);
+    });
 
-
-    // fetchImage(); NO LONGER CALLING IMAGE HERE
-    // console.log("imageDataUri preview:", imageDataUri?.slice(0, 50));
     return () => { isMounted = false };
   }, []);
 
@@ -135,12 +162,13 @@ function HomeScreen({ navigation }) {
       }
 
       const data = await res.json();
+      console.log('Rooms data:', data);
+
       setRooms(data);
     } catch (err) {
       console.error('Error fetching rooms:', err.message);
     }
   };
-
 
   const createRoom = async () => {
     try {
@@ -170,7 +198,11 @@ function HomeScreen({ navigation }) {
 
       const fetch = async () => {
         const token = await SecureStore.getItemAsync('jwt');
-        if (token) {
+       if (token) {
+          const userId = await getUserIdFromToken(); 
+          console.log("Refreshed userId from JWT:", userId);
+          setUserId(userId);
+
           await fetchRooms();
           intervalId = setInterval(fetchRooms, 5000);
         } else {
@@ -187,6 +219,27 @@ function HomeScreen({ navigation }) {
     }, [])
   );
 
+    const deleteRoom = async (roomId) => {
+      try {
+        const token = await SecureStore.getItemAsync('jwt');
+        const res = await fetch(`${backendUrl}/rooms/${roomId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          }
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`Failed to delete room: ${err}`);
+        }
+        
+        console.log(`Room ${roomId} deleted successfully`);
+        await fetchRooms();
+      } catch (err) {
+          console.error('Error deleting room:', err.message);
+        }
+    };
 
   return (
     <View style={styles.container}>
@@ -196,14 +249,6 @@ function HomeScreen({ navigation }) {
           navigation.navigate("Accounts")
         }
       />
-      {isLoadingImage && <Text>Loading secure image...</Text>}
-      {imageDataUri && (
-        <Image
-          source={{ uri: imageDataUri }}
-          style={{ width: 300, height: 200, borderRadius: 10, marginBottom: 15 }}
-          resizeMode="contain"
-        />
-      )}
       <TextInput
         style={styles.input}
         value={roomName}
@@ -212,10 +257,10 @@ function HomeScreen({ navigation }) {
       />
       <Button title="Create Room" onPress={createRoom} />
       <ScrollView style={styles.roomList}>
-        {Object.keys(rooms).map((roomId) => (
+        {Object.entries(rooms).map(([roomId, roomObj]) => (
           <View key={roomId} style={styles.roomCard}>
             <Text style={styles.roomId}>
-              {rooms[roomId]?.roomName || 'Unnamed Room'}
+              {roomObj.roomName || 'Unnamed Room'}
               (ID: {roomId})
             </Text>
             <Button
@@ -227,6 +272,13 @@ function HomeScreen({ navigation }) {
                 })
               }
             />
+            {userId && userId === roomObj.creatorUserId && (
+              <Button
+                title="Delete Room"
+                color="red"
+                onPress={() => deleteRoom(roomId)}
+              />
+            )}
           </View>
         ))}
       </ScrollView>
@@ -314,7 +366,7 @@ function ActiveRoomScreen({ route }) {
     socketRef.current = new WebSocket(wsUrl);
 
     const token = await SecureStore.getItemAsync('jwt');
-    if (!token) throw new Error("No token available");
+    if (!token) throw new Error("Please Sign in");
 
     socketRef.current.onopen = async () => {
       console.log('Connected to WebSocket');

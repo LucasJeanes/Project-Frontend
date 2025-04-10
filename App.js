@@ -12,8 +12,8 @@ import * as ImagePicker from 'expo-image-picker';
 
 const Stack = createNativeStackNavigator();
 
-const backendUrl = "https://075e-80-233-37-38.ngrok-free.app";
-//const backendUrl = "https://bbcbrian.arraylist.me";
+//const backendUrl = "https://075e-80-233-37-38.ngrok-free.app";
+const backendUrl = "https://bbcbrian.arraylist.me";
 
 export default function App() {
   return (
@@ -53,7 +53,7 @@ function AccountScreen({ navigation }) {
         throw new Error('No token received');
       }
     } catch (err) {
-      console.error('Login error:', err.message);
+      console.log('Login error:', err.message);
     }
   };
 
@@ -73,7 +73,7 @@ function AccountScreen({ navigation }) {
       const data = await res.json();
       console.log("Signup successful. You may now log in.");
     } catch (err) {
-      console.error('Signup error:', err.message);
+      console.log('Signup error:', err.message);
     }
   };
 
@@ -86,7 +86,7 @@ function AccountScreen({ navigation }) {
         routes: [{ name: 'Home' }],
       });
     } catch (err) {
-      console.error('Logout error:', err.message);
+      console.log('Logout error:', err.message);
     }
   }
 
@@ -128,7 +128,7 @@ function HomeScreen({ navigation }) {
         const payload = JSON.parse(atob(token.split('.')[1]));
         return payload.sub;
       } catch (err) {
-        console.error("Error decoding JWT:", err);
+        console.log("Error decoding JWT:", err);
         return null;
       }
   };
@@ -166,7 +166,7 @@ function HomeScreen({ navigation }) {
 
       setRooms(data);
     } catch (err) {
-      console.error('Error fetching rooms:', err.message);
+      console.log('Error fetching rooms:', err.message);
     }
   };
 
@@ -188,7 +188,7 @@ function HomeScreen({ navigation }) {
       await fetchRooms();
       console.log('Created room:', data);
     } catch (err) {
-      console.error('Failed to create room:', err);
+      console.log('Failed to create room:', err);
     }
   };
 
@@ -237,7 +237,7 @@ function HomeScreen({ navigation }) {
         console.log(`Room ${roomId} deleted successfully`);
         await fetchRooms();
       } catch (err) {
-          console.error('Error deleting room:', err.message);
+          console.log('Error deleting room:', err.message);
         }
     };
 
@@ -407,7 +407,7 @@ function ActiveRoomScreen({ route }) {
           }
         }
       } catch (e) {
-        console.error("Error while fetching history", e);
+        console.log("Error while fetching history", e);
       }
 
     };
@@ -450,13 +450,13 @@ function ActiveRoomScreen({ route }) {
         };
 
         reader.onerror = (err) => {
-          console.error("Error reading blob:", err);
+          console.log("Error reading blob:", err);
           setIsLoadingImage(false);
         };
 
         reader.readAsDataURL(blob);
       } catch (err) {
-        console.error("Error loading image:", err.message);
+        console.log("Error loading image:", err.message);
         setIsLoadingImage(false);
       }
     };
@@ -498,7 +498,7 @@ function ActiveRoomScreen({ route }) {
     };
 
     socketRef.current.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.log('WebSocket error:', error);
     };
   };
 
@@ -533,13 +533,13 @@ function ActiveRoomScreen({ route }) {
 
           if (!res.ok) {
             const errText = await res.text();
-            console.error("Image upload failed:", errText);
+            console.log("Image upload failed:", errText);
           } else {
 
             console.log("Image sent successfully");
           }
         } catch (e) {
-          console.error("Error sending image:", e);
+          console.log("Error sending image:", e);
         }
 
       } else { // send normal message
